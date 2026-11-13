@@ -70,6 +70,10 @@
         {
           "name": "SENTRY_ENVIRONMENT",
           "value": "staging"
+        },
+        {
+          "name": "API_DOCS_PUBLIC",
+          "value": "true"
         }
       ],
       "secrets": [

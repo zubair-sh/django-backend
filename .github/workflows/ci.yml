@@ -61,6 +61,11 @@ jobs:
           AWS_STORAGE_BUCKET_NAME: ci-bucket
           CDN_DOMAIN: cdn.example.com
 
+      - name: API schema is valid (no warnings)
+        run: uv run python manage.py spectacular --validate --fail-on-warn --file /dev/null
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+
       - name: Tests (with coverage minimum)
         run: uv run pytest --cov
 

@@ -23,7 +23,8 @@ production (`staging` → `prod` in names). Region: `ap-south-1`.
       ALB (443 → target group, 80 → 443, idle timeout 60 s)
 - [ ] Log group `/ecs/backend-<env>`, cluster `backend-<env>`
 - [ ] Fill in `deploy/taskdef-<environment>.json` and `deploy/taskdef-<environment>-worker.json`
-      (ACCOUNT_ID, secret ARN suffix, domains, bucket, CDN_DOMAIN, from-address)
+      (ACCOUNT_ID, secret ARN suffix, domains, bucket, CDN_DOMAIN, from-address). Staging sets
+      `API_DOCS_PUBLIC=true`; production leaves it out, so Swagger is staff-only there
 - [ ] First image push, register both task definitions, `scripts/run-oneoff.sh` migrate + collectstatic
 - [ ] Services: `backend-<env>` (web, behind the ALB) and `backend-<env>-worker` (no load balancer), both in the
       private subnets with `app-sg`; turn on "Deployment circuit breaker" with rollback

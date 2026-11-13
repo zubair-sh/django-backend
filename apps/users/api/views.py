@@ -1,6 +1,6 @@
 from axes.handlers.proxy import AxesProxyHandler
 from django.core.exceptions import ValidationError as DjangoValidationError
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import generics, status
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny
@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairView, TokenRefreshView
 
+from apps.core.schema import RATE_LIMITED, VALIDATION_ERROR, error
 from apps.users import services
 
 from .serializers import (
@@ -19,6 +20,7 @@ from .serializers import (
     PasswordResetRequestSerializer,
     RegisterResponseSerializer,
     RegisterSerializer,
+    TokenPairSerializer,
     UserSerializer,
 )
 
@@ -30,6 +32,16 @@ class AuthThrottleMixin:
         return [*super().get_throttles(), ScopedRateThrottle()]
 
 
+@extend_schema_view(
+    post=extend_schema(
+        summary="Log in",
+        responses={
+            200: TokenPairSerializer,
+            401: error("Wrong email or password"),
+            429: error("Too many attempts: 5 failures lock the account for this IP for 15 minutes"),
+        },
+    )
+)
 class LoginView(AuthThrottleMixin, TokenObtainPairView):
     """Email + password in; access and refresh tokens out. After 5 failures the account is locked for this IP
     for 15 minutes, and the response is 429."""
@@ -49,18 +61,43 @@ class LoginView(AuthThrottleMixin, TokenObtainPairView):
             raise
 
 
+@extend_schema_view(
+    post=extend_schema(
+        summary="Refresh tokens",
+        responses={
+            200: TokenPairSerializer,
+            401: error("Refresh token expired, invalid or already used"),
+            429: RATE_LIMITED,
+        },
+    )
+)
 class RefreshView(AuthThrottleMixin, TokenRefreshView):
     """Refresh token in; a new access token and a new refresh token out (the old refresh token stops working)."""
 
 
+@extend_schema_view(
+    post=extend_schema(
+        summary="Log out",
+        responses={
+            200: OpenApiResponse(description="Signed out"),
+            401: error("Token invalid or already used"),
+            429: RATE_LIMITED,
+        },
+    )
+)
 class LogoutView(AuthThrottleMixin, TokenBlacklistView):
     """Refresh token in; that token stops working."""
 
 
 class RegisterView(AuthThrottleMixin, APIView):
+    authentication_classes = ()
     permission_classes = [AllowAny]
 
-    @extend_schema(request=RegisterSerializer, responses={201: RegisterResponseSerializer})
+    @extend_schema(
+        summary="Create an account",
+        request=RegisterSerializer,
+        responses={201: RegisterResponseSerializer, 400: VALIDATION_ERROR, 429: RATE_LIMITED},
+    )
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -78,9 +115,14 @@ class RegisterView(AuthThrottleMixin, APIView):
 class PasswordResetRequestView(AuthThrottleMixin, APIView):
     """Always answers 202, whether or not the email has an account."""
 
+    authentication_classes = ()
     permission_classes = [AllowAny]
 
-    @extend_schema(request=PasswordResetRequestSerializer, responses={202: None})
+    @extend_schema(
+        summary="Request a password reset email",
+        request=PasswordResetRequestSerializer,
+        responses={202: OpenApiResponse(description="Accepted"), 400: VALIDATION_ERROR, 429: RATE_LIMITED},
+    )
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -91,9 +133,18 @@ class PasswordResetRequestView(AuthThrottleMixin, APIView):
 class PasswordResetConfirmView(AuthThrottleMixin, APIView):
     """uid and token come from the emailed link. Success signs the user out on every device."""
 
+    authentication_classes = ()
     permission_classes = [AllowAny]
 
-    @extend_schema(request=PasswordResetConfirmSerializer, responses={204: None})
+    @extend_schema(
+        summary="Set a new password from the emailed link",
+        request=PasswordResetConfirmSerializer,
+        responses={
+            204: OpenApiResponse(description="Password changed; all sessions signed out"),
+            400: OpenApiResponse(description="Link invalid or expired, or the new password is too weak"),
+            429: RATE_LIMITED,
+        },
+    )
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -109,7 +160,16 @@ class PasswordResetConfirmView(AuthThrottleMixin, APIView):
 class PasswordChangeView(AuthThrottleMixin, APIView):
     """Signs the user out on every device; the app should log in again with the new password."""
 
-    @extend_schema(request=PasswordChangeSerializer, responses={204: None})
+    @extend_schema(
+        summary="Change password",
+        request=PasswordChangeSerializer,
+        responses={
+            204: OpenApiResponse(description="Password changed; all sessions signed out"),
+            400: VALIDATION_ERROR,
+            401: error("Not signed in"),
+            429: RATE_LIMITED,
+        },
+    )
     def post(self, request):
         serializer = PasswordChangeSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -117,6 +177,10 @@ class PasswordChangeView(AuthThrottleMixin, APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema_view(
+    get=extend_schema(summary="Get my profile"),
+    patch=extend_schema(summary="Update my name"),
+)
 class MeView(generics.RetrieveUpdateAPIView):
     """The signed-in user's own profile."""
 

@@ -42,6 +42,10 @@ Run `make help` for every command. `make test`, `make lint` and `make audit` run
 | `GET/PATCH /api/v1/users/me/` | The signed-in user's profile |
 | `/api/v1/posts/` | Worked example: list, create, update, delete your own posts |
 
+**Swagger** (`/api/v1/docs/`): log in with *Try it out* on `POST /auth/login/`, click **Authorize**, paste the
+`access` token. Docs are open in dev and staging; in production only staff can see them (sign in through the admin
+first), unless `API_DOCS_PUBLIC=true`. Swagger UI is served from our own static files, not a CDN.
+
 Send `Authorization: Bearer <access token>` on every other request. Auth endpoints allow 10 requests a minute per
 client, and 5 wrong passwords lock that account for that IP for 15 minutes (429). Every response carries an
 `X-Request-ID` header; send your own to trace a request through the logs.

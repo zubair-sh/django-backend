@@ -76,6 +76,10 @@
         {
           "name": "GUNICORN_THREADS",
           "value": "4"
+        },
+        {
+          "name": "API_DOCS_PUBLIC",
+          "value": "true"
         }
       ],
       "secrets": [

@@ -30,6 +30,7 @@ THIRD_PARTY_APPS = [
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",
+    "drf_spectacular_sidecar",  # Swagger UI files served from our own static files, not a CDN
     "corsheaders",
     "axes",
     "anymail",
@@ -154,10 +155,38 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "user": "600/min", "auth": "10/min"},
 }
 
+# API docs: Swagger UI at /api/v1/docs/, OpenAPI schema at /api/v1/schema/.
+API_DOCS_PUBLIC = env.bool("API_DOCS_PUBLIC", default=True)
 SPECTACULAR_SETTINGS = {
     "TITLE": "Backend API",
     "VERSION": "1.0.0",
+    "DESCRIPTION": (
+        "**Signing in here:** call `POST /api/v1/auth/login/` with *Try it out*, copy the `access` token, "
+        "click **Authorize** and paste it into `jwtAuth` (no `Bearer ` prefix). Access tokens last 15 minutes.\n\n"
+        'Errors come back as `{"detail": "..."}`, or for invalid input as an object of field name → messages. '
+        "Every response carries an `X-Request-ID` header; quote it when reporting a problem."
+    ),
     "SERVE_INCLUDE_SCHEMA": False,
+    "SERVE_PERMISSIONS": ["apps.core.permissions.CanViewApiDocs"],
+    # Document JWT only: clients use tokens; the session cookie is just for browsing after an admin login.
+    "AUTHENTICATION_WHITELIST": ["rest_framework_simplejwt.authentication.JWTAuthentication"],
+    "SCHEMA_PATH_PREFIX": r"/api/v1",
+    # Separate request and response models, so generated client code marks read-only fields correctly.
+    "COMPONENT_SPLIT_REQUEST": True,
+    "TAGS": [
+        {"name": "auth", "description": "Register, log in, tokens and passwords"},
+        {"name": "users", "description": "The signed-in user's profile"},
+        {"name": "posts", "description": "Worked example: each user's own posts"},
+    ],
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "REDOC_DIST": "SIDECAR",
+    "SWAGGER_UI_SETTINGS": {
+        "persistAuthorization": True,  # keep the token across page reloads
+        "displayRequestDuration": True,
+        "filter": True,
+        "tryItOutEnabled": True,
+    },
 }
 
 # --- Email: dev reads EMAIL_URL (Mailpit in Docker, console otherwise); prod uses SES ---

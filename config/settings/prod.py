@@ -10,6 +10,8 @@ DEBUG = False
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS")
 FRONTEND_URL = env("FRONTEND_URL").rstrip("/")
+# API docs: staff only unless the task definition turns them on (staging does).
+API_DOCS_PUBLIC = env.bool("API_DOCS_PUBLIC", default=False)
 
 # Database: RDS with SSL.
 DATABASES["default"].setdefault("OPTIONS", {})["sslmode"] = "require"

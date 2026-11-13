@@ -7,5 +7,9 @@ CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localho
 
 INSTALLED_APPS = [*INSTALLED_APPS, "debug_toolbar", "django_extensions"]
 MIDDLEWARE = [*MIDDLEWARE, "debug_toolbar.middleware.DebugToolbarMiddleware"]
-# Inside Docker the request IP isn't 127.0.0.1, so show the toolbar whenever DEBUG is on.
-DEBUG_TOOLBAR_CONFIG = {"SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG}
+# Inside Docker the request IP isn't 127.0.0.1, so show the toolbar whenever DEBUG is on,
+# except on the API docs page, where it would cover Swagger's Authorize button.
+DEBUG_TOOLBAR_CONFIG = {
+    "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG and not request.path.startswith("/api/v1/docs/"),
+    "SHOW_COLLAPSED": True,
+}
