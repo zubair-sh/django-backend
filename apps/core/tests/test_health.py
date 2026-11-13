@@ -1,7 +1,7 @@
 import json
 import logging
 
-from apps.core.logging import JsonFormatter
+from apps.core.logging import JsonFormatter, RequestIdFilter
 
 
 def test_health_ok(client, db):
@@ -17,6 +17,8 @@ def test_health_ignores_allowed_hosts(client, db):
 
 def test_json_formatter():
     record = logging.makeLogRecord({"name": "app", "levelname": "INFO", "msg": "hi %s", "args": ("there",)})
+    RequestIdFilter().filter(record)
     line = json.loads(JsonFormatter().format(record))
     assert line["message"] == "hi there"
     assert line["level"] == "INFO"
+    assert line["request_id"] == "-"

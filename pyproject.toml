@@ -1,12 +1,45 @@
 [project]
 name = "django-backend"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "Django>=5.2.19,<5.3",
+    "djangorestframework>=3.18.3",
+    "djangorestframework-simplejwt>=5.5.1",
+    "drf-spectacular>=0.30.0",
+    "django-environ>=0.14.0",
+    "django-cors-headers>=4.9.0",
+    "django-axes[ipware]>=9.0.0",
+    "django-anymail>=15.2",  # SES sending uses boto3 (from django-storages[s3])
+    "django-storages[s3]>=1.14.6",
+    "psycopg[binary]>=3.3.9",
+    "redis>=8.1.0",
+    "celery>=5.7.0",
+    "gunicorn>=27.0.1",
+    "sentry-sdk>=2.75.0",
+]
+
+[dependency-groups]
+dev = [
+    "django-debug-toolbar>=8.0.0",
+    "django-extensions>=4.1",
+    "ipython>=9.18.1",
+    "pytest>=9.2.0",
+    "pytest-django>=4.14.0",
+    "pytest-cov>=7.1.0",
+    "factory-boy>=3.3.3",
+    "ruff>=0.17.5",
+    "pre-commit>=4.0.0",
+]
+
+[tool.uv]
+package = false
 
 [tool.ruff]
 line-length = 120
 target-version = "py312"
 extend-exclude = ["**/migrations/*"]
+force-exclude = true  # also when pre-commit passes file names
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "DJ", "S"]
@@ -14,8 +47,18 @@ ignore = ["S101"]  # assert is fine in tests
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/*" = ["S105", "S106"]
+"conftest.py" = ["S105", "S106"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
 python_files = ["test_*.py"]
 addopts = "--reuse-db -q"
+
+[tool.coverage.run]
+source = ["apps", "config"]
+omit = ["**/migrations/*", "**/tests/*", "config/asgi.py", "config/wsgi.py", "config/settings/dev.py", "config/settings/prod.py"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true

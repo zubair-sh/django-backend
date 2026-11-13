@@ -1,0 +1,103 @@
+{
+  "family": "backend-staging-worker",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/backend-staging-execution",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/backend-staging-task",
+  "cpu": "512",
+  "memory": "1024",
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/backend:latest",
+      "essential": true,
+      "command": [
+        "celery",
+        "-A",
+        "config",
+        "worker",
+        "--loglevel=info",
+        "--concurrency=4"
+      ],
+      "stopTimeout": 120,
+      "environment": [
+        {
+          "name": "DJANGO_SETTINGS_MODULE",
+          "value": "config.settings.prod"
+        },
+        {
+          "name": "DJANGO_ALLOWED_HOSTS",
+          "value": "staging-api.yourdomain.com"
+        },
+        {
+          "name": "DJANGO_CSRF_TRUSTED_ORIGINS",
+          "value": "https://staging-api.yourdomain.com"
+        },
+        {
+          "name": "DJANGO_ADMIN_URL",
+          "value": "admin/"
+        },
+        {
+          "name": "DJANGO_DEFAULT_FROM_EMAIL",
+          "value": "noreply@yourdomain.com"
+        },
+        {
+          "name": "FRONTEND_URL",
+          "value": "https://staging-app.yourdomain.com"
+        },
+        {
+          "name": "CORS_ALLOWED_ORIGINS",
+          "value": "https://staging-app.yourdomain.com"
+        },
+        {
+          "name": "AWS_REGION",
+          "value": "ap-south-1"
+        },
+        {
+          "name": "AWS_STORAGE_BUCKET_NAME",
+          "value": "backend-staging-files"
+        },
+        {
+          "name": "CDN_DOMAIN",
+          "value": "dxxxx.cloudfront.net"
+        },
+        {
+          "name": "SENTRY_ENVIRONMENT",
+          "value": "staging"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DJANGO_SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:backend/staging-XXXXXX:DJANGO_SECRET_KEY::"
+        },
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:backend/staging-XXXXXX:DATABASE_URL::"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:backend/staging-XXXXXX:REDIS_URL::"
+        },
+        {
+          "name": "SENTRY_DSN",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:backend/staging-XXXXXX:SENTRY_DSN::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/backend-staging",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "worker"
+        }
+      }
+    }
+  ]
+}

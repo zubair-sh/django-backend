@@ -27,40 +27,52 @@ jobs:
           --health-cmd "pg_isready -U postgres -d app"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DJANGO_SECRET_KEY: ci-only-not-secret
+      DJANGO_SECRET_KEY: ci-only-not-secret-0123456789abcdef
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/app
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: requirements/*.txt
-      - run: pip install -r requirements/dev.txt
+          enable-cache: true
+      - name: Install dependencies (exactly as locked)
+        run: uv sync --frozen
 
       - name: Lint
         run: |
-          ruff check .
-          ruff format --check .
+          uv run ruff check .
+          uv run ruff format --check .
 
       - name: Migrations are up to date
-        run: python manage.py makemigrations --check --dry-run
+        run: uv run python manage.py makemigrations --check --dry-run
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
 
       - name: Deployment checks (check --deploy)
-        run: python manage.py check --deploy --fail-level WARNING
+        run: uv run python manage.py check --deploy --fail-level WARNING
         env:
           DJANGO_SETTINGS_MODULE: config.settings.prod
           DJANGO_SECRET_KEY: ci-check-deploy-${{ github.run_id }}-a-long-random-looking-value-for-the-check
           DJANGO_ALLOWED_HOSTS: api.example.com
           DJANGO_CSRF_TRUSTED_ORIGINS: https://api.example.com
+          DJANGO_DEFAULT_FROM_EMAIL: noreply@example.com
+          FRONTEND_URL: https://app.example.com
+          REDIS_URL: rediss://redis.example.com:6379/0
           AWS_REGION: ap-south-1
           AWS_STORAGE_BUCKET_NAME: ci-bucket
           CDN_DOMAIN: cdn.example.com
 
-      - name: Tests
-        run: pytest
+      - name: Tests (with coverage minimum)
+        run: uv run pytest --cov
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Check dependencies for known vulnerabilities
+        run: |
+          uv export --frozen --no-dev --no-hashes --no-emit-project -o requirements-audit.txt
+          uvx pip-audit --strict --no-deps --disable-pip -r requirements-audit.txt
 
   docker:
     runs-on: ubuntu-latest

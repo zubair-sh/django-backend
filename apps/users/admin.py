@@ -6,6 +6,7 @@ from .models import User
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ("username", "email", "first_name", "last_name", "is_staff")
-    search_fields = ("username", "email", "first_name", "last_name")
-    add_fieldsets = ((None, {"classes": ("wide",), "fields": ("username", "email", "password1", "password2")}),)
+    list_display = ("email", "username", "first_name", "last_name", "is_staff", "date_joined")
+    search_fields = ("email", "username", "first_name", "last_name")
+    ordering = ("-date_joined",)
+    add_fieldsets = ((None, {"classes": ("wide",), "fields": ("email", "username", "password1", "password2")}),)

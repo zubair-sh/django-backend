@@ -1,4 +1,30 @@
+x-app: &app
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+    target: dev
+  env_file: .env
+  environment:
+    DJANGO_SETTINGS_MODULE: config.settings.dev
+  volumes:
+    - .:/app
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
 services:
+  web:
+    <<: *app
+    ports:
+      - "8000:8000"
+
+  worker:
+    <<: *app
+    command: celery -A config worker --loglevel=info --concurrency=2
+    # Celery doesn't reload on code changes: run `make restart-worker` after editing tasks.
+
   db:
     image: postgres:16
     environment:
@@ -15,21 +41,20 @@ services:
       timeout: 3s
       retries: 20
 
-  web:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      target: dev
-    env_file: .env
-    environment:
-      DJANGO_SETTINGS_MODULE: config.settings.dev
-    volumes:
-      - .:/app
+  redis:
+    image: redis:7
     ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"  # inbox UI: http://localhost:8025
 
 volumes:
   pgdata:

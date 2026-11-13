@@ -1,0 +1,103 @@
+{
+  "family": "backend-prod-worker",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/backend-prod-execution",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/backend-prod-task",
+  "cpu": "512",
+  "memory": "1024",
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/backend:latest",
+      "essential": true,
+      "command": [
+        "celery",
+        "-A",
+        "config",
+        "worker",
+        "--loglevel=info",
+        "--concurrency=4"
+      ],
+      "stopTimeout": 120,
+      "environment": [
+        {
+          "name": "DJANGO_SETTINGS_MODULE",
+          "value": "config.settings.prod"
+        },
+        {
+          "name": "DJANGO_ALLOWED_HOSTS",
+          "value": "api.yourdomain.com"
+        },
+        {
+          "name": "DJANGO_CSRF_TRUSTED_ORIGINS",
+          "value": "https://api.yourdomain.com"
+        },
+        {
+          "name": "DJANGO_ADMIN_URL",
+          "value": "manage-CHANGE-ME/"
+        },
+        {
+          "name": "DJANGO_DEFAULT_FROM_EMAIL",
+          "value": "noreply@yourdomain.com"
+        },
+        {
+          "name": "FRONTEND_URL",
+          "value": "https://app.yourdomain.com"
+        },
+        {
+          "name": "CORS_ALLOWED_ORIGINS",
+          "value": "https://app.yourdomain.com"
+        },
+        {
+          "name": "AWS_REGION",
+          "value": "ap-south-1"
+        },
+        {
+          "name": "AWS_STORAGE_BUCKET_NAME",
+          "value": "backend-prod-files"
+        },
+        {
+          "name": "CDN_DOMAIN",
+          "value": "dxxxx.cloudfront.net"
+        },
+        {
+          "name": "SENTRY_ENVIRONMENT",
+          "value": "production"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DJANGO_SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:backend/prod-XXXXXX:DJANGO_SECRET_KEY::"
+        },
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:backend/prod-XXXXXX:DATABASE_URL::"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:backend/prod-XXXXXX:REDIS_URL::"
+        },
+        {
+          "name": "SENTRY_DSN",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:backend/prod-XXXXXX:SENTRY_DSN::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/backend-prod",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "worker"
+        }
+      }
+    }
+  ]
+}

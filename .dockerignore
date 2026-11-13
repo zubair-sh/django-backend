@@ -8,4 +8,5 @@
 staticfiles
 media
 docs
+.pre-commit-config.yaml
 deploy

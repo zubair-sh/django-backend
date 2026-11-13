@@ -2,7 +2,18 @@ import json
 import logging
 from datetime import UTC, datetime
 
+from .request_id import get_request_id
+
 _STANDARD_ATTRS = set(vars(logging.makeLogRecord({}))) | {"message", "asctime"}
+
+
+class RequestIdFilter(logging.Filter):
+    """Adds the current request ID (or "-") to every log record."""
+
+    def filter(self, record):
+        if not hasattr(record, "request_id"):
+            record.request_id = get_request_id()
+        return True
 
 
 class JsonFormatter(logging.Formatter):

@@ -1,7 +1,7 @@
 name: release
 
-# Deploys one already-built image to one environment:
-# register the task definition, run migrate + collectstatic as a one-off task, then roll out the service.
+# Deploys one already-built image to one environment: register the web and worker task definitions,
+# run migrate + collectstatic as a one-off task, then roll out the web and worker services.
 on:
   workflow_call:
     inputs:
@@ -39,32 +39,39 @@ jobs:
           account=$(aws sts get-caller-identity --query Account --output text)
           echo "uri=${account}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPOSITORY || 'backend' }}:${{ inputs.image-tag }}" >> "$GITHUB_OUTPUT"
 
-      - name: Render task definition
-        id: taskdef
+      - name: Render web task definition
+        id: web-taskdef
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: deploy/taskdef-${{ inputs.environment }}.json
           container-name: web
           image: ${{ steps.image.outputs.uri }}
 
-      - name: Register task definition
+      - name: Render worker task definition
+        id: worker-taskdef
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: deploy/taskdef-${{ inputs.environment }}-worker.json
+          container-name: worker
+          image: ${{ steps.image.outputs.uri }}
+
+      - name: Register task definitions
         id: register
         run: |
-          arn=$(aws ecs register-task-definition \
-            --cli-input-json "file://${{ steps.taskdef.outputs.task-definition }}" \
-            --query 'taskDefinition.taskDefinitionArn' --output text)
-          echo "arn=$arn" >> "$GITHUB_OUTPUT"
+          register() {
+            aws ecs register-task-definition --cli-input-json "file://$1" \
+              --query 'taskDefinition.taskDefinitionArn' --output text
+          }
+          echo "web=$(register '${{ steps.web-taskdef.outputs.task-definition }}')" >> "$GITHUB_OUTPUT"
+          echo "worker=$(register '${{ steps.worker-taskdef.outputs.task-definition }}')" >> "$GITHUB_OUTPUT"
 
       - name: Migrate and collect static files
         run: |
-          scripts/run-oneoff.sh "${{ steps.register.outputs.arn }}" \
+          scripts/run-oneoff.sh "${{ steps.register.outputs.web }}" \
             "python manage.py migrate --noinput && python manage.py collectstatic --noinput"
 
-      - name: Roll out the service
-        run: |
-          aws ecs update-service \
-            --cluster "$ECS_CLUSTER" \
-            --service "${{ vars.ECS_SERVICE }}" \
-            --task-definition "${{ steps.register.outputs.arn }}" \
-            --query 'service.serviceName' --output text
-          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "${{ vars.ECS_SERVICE }}"
+      - name: Roll out web
+        run: scripts/deploy-service.sh "$ECS_CLUSTER" "${{ vars.ECS_SERVICE }}" "${{ steps.register.outputs.web }}"
+
+      - name: Roll out worker
+        run: scripts/deploy-service.sh "$ECS_CLUSTER" "${{ vars.ECS_WORKER_SERVICE }}" "${{ steps.register.outputs.worker }}"
