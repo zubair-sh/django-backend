@@ -1,0 +1,70 @@
+name: release
+
+# Deploys one already-built image to one environment:
+# register the task definition, run migrate + collectstatic as a one-off task, then roll out the service.
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      image-tag:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      SUBNET_IDS: ${{ vars.SUBNET_IDS }}
+      SECURITY_GROUP_IDS: ${{ vars.SECURITY_GROUP_IDS }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Work out the image URI
+        id: image
+        run: |
+          account=$(aws sts get-caller-identity --query Account --output text)
+          echo "uri=${account}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPOSITORY || 'backend' }}:${{ inputs.image-tag }}" >> "$GITHUB_OUTPUT"
+
+      - name: Render task definition
+        id: taskdef
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: deploy/taskdef-${{ inputs.environment }}.json
+          container-name: web
+          image: ${{ steps.image.outputs.uri }}
+
+      - name: Register task definition
+        id: register
+        run: |
+          arn=$(aws ecs register-task-definition \
+            --cli-input-json "file://${{ steps.taskdef.outputs.task-definition }}" \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "arn=$arn" >> "$GITHUB_OUTPUT"
+
+      - name: Migrate and collect static files
+        run: |
+          scripts/run-oneoff.sh "${{ steps.register.outputs.arn }}" \
+            "python manage.py migrate --noinput && python manage.py collectstatic --noinput"
+
+      - name: Roll out the service
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "${{ vars.ECS_SERVICE }}" \
+            --task-definition "${{ steps.register.outputs.arn }}" \
+            --query 'service.serviceName' --output text
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "${{ vars.ECS_SERVICE }}"

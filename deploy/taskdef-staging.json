@@ -1,0 +1,41 @@
+{
+  "family": "backend-staging",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "runtimePlatform": { "cpuArchitecture": "X86_64", "operatingSystemFamily": "LINUX" },
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/backend-staging-execution",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/backend-staging-task",
+  "containerDefinitions": [
+    {
+      "name": "web",
+      "image": "ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/backend:latest",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8000, "protocol": "tcp" }],
+      "environment": [
+        { "name": "DJANGO_SETTINGS_MODULE", "value": "config.settings.prod" },
+        { "name": "DJANGO_ALLOWED_HOSTS", "value": "staging-api.yourdomain.com" },
+        { "name": "DJANGO_CSRF_TRUSTED_ORIGINS", "value": "https://staging-api.yourdomain.com" },
+        { "name": "DJANGO_ADMIN_URL", "value": "admin/" },
+        { "name": "AWS_REGION", "value": "ap-south-1" },
+        { "name": "AWS_STORAGE_BUCKET_NAME", "value": "backend-staging-files" },
+        { "name": "CDN_DOMAIN", "value": "dxxxx.cloudfront.net" },
+        { "name": "SENTRY_ENVIRONMENT", "value": "staging" }
+      ],
+      "secrets": [
+        { "name": "DJANGO_SECRET_KEY", "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:backend/staging-XXXXXX:DJANGO_SECRET_KEY::" },
+        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:backend/staging-XXXXXX:DATABASE_URL::" },
+        { "name": "SENTRY_DSN", "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:backend/staging-XXXXXX:SENTRY_DSN::" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/backend-staging",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
